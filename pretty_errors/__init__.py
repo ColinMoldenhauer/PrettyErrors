@@ -984,28 +984,6 @@ if active and (not interactive_tty_only or terminal_is_interactive):
 
 
 
-if __name__ == "__main__":
-    configure(
-        filename_display    = FILENAME_EXTENDED,
-        line_number_first   = True,
-        display_link        = True,
-        lines_before        = 5,
-        lines_after         = 2,
-        line_color          = RED + '> ' + default_config.line_color,
-        code_color          =       '  ' + default_config.line_color,
-        truncate_code       = True,
-        inner_exception_separator=True,
-        inner_exception_message = MAGENTA + "\n  During handling of the above exception, another exception occurred:\n",
-        display_locals      = True
-    )
-    blacklist('c:/python')
-    try:
-        myval = [1,2]
-        print(myval[3])
-    except:
-        a = "C" * "B"
-
-
 class ColorExceptionWriter(ExceptionWriter):
     """
         Custom ExceptionWriter class, that preserves the original structure of the Python exception,
@@ -1031,19 +1009,19 @@ class ColorExceptionWriter(ExceptionWriter):
             function_color            = BLUE,
             link_color                = MAGENTA,
             exception_color           = BRIGHT_RED,
-            line_color                = BLACK,          # code snippets
-            exception_arg_color       = BLACK,          # Exception description
-
+            line_color                = None,          # code snippets
+            exception_arg_color       = None,          # Exception description (or RESET_COLOR)
 
             code_color                = CYAN,
-            timestamp_color           = BLACK,
+            timestamp_color           = None,
             local_name_color          = RED_BACKGROUND,
             local_value_color         = CYAN_BACKGROUND,
             local_len_color           = MAGENTA_BACKGROUND,
-            exception_file_color      = GREEN_BACKGROUND,
+            exception_file_color      = RED,
+
             syntax_error_color        = CYAN,
-            arrow_tail_color          = BRIGHT_YELLOW,
-            arrow_head_color          = BRIGHT_BLUE,
+            arrow_tail_color          = CYAN,
+            arrow_head_color          = CYAN,
         )
 
         super().__init__()
@@ -1056,9 +1034,7 @@ class ColorExceptionWriter(ExceptionWriter):
     def write_header(self):
         self.output_text(self._local_col(f"Traceback (most recent call last):", self.config.header_color))
 
-
     def write_code(self, filepath, line, module_globals, is_final, point_at = None):
-        # TODO: regex raise -> red?
         lines = []
         if filepath == '<stdin>':
             lines.append(str(line).rstrip())
@@ -1131,8 +1107,6 @@ class ColorExceptionWriter(ExceptionWriter):
 
     def write_location(self, path, line, function):
         line_number = str(line)
-        # line_number = str(line) + ' '
-        # self.output_text('')
         if self.config.filename_display == FILENAME_FULL:
             filename = ""
             path_str = self._local_col(f"\"{path}\"", self.config.filename_color)
@@ -1171,15 +1145,30 @@ class ColorExceptionWriter(ExceptionWriter):
         else:
             output = [self.config.exception_color, self.exception_name(exception_type)]
 
-        for attr in ("filename", "filename2"):
-            if hasattr(exception_value, attr):
-                path = getattr(exception_value, attr)
-                if path is not None:
-                    output.append('\n')
-                    output.append(self.config.exception_file_color)
-                    output.append(path)
-
         self.output_text(output)
 
 
 exception_writer = ColorExceptionWriter()
+
+
+
+if __name__ == "__main__":
+    configure(
+        filename_display    = FILENAME_EXTENDED,
+        line_number_first   = True,
+        display_link        = True,
+        lines_before        = 5,
+        lines_after         = 2,
+        line_color          = RED + '> ' + default_config.line_color,
+        code_color          =       '  ' + default_config.line_color,
+        truncate_code       = True,
+        inner_exception_separator=True,
+        inner_exception_message = MAGENTA + "\n  During handling of the above exception, another exception occurred:\n",
+        display_locals      = True
+    )
+    blacklist('c:/python')
+    try:
+        myval = [1,2]
+        print(myval[3])
+    except:
+        a = "C" * "B"
