@@ -1050,7 +1050,7 @@ class ColorExceptionWriter(ExceptionWriter):
 
 
     def _local_col(self, txt, col, reset=None):
-        reset = reset or BLACK
+        reset = reset or RESET_COLOR
         return f"{col}{txt}{reset}"
 
     def write_header(self):
