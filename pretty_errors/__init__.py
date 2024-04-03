@@ -1037,7 +1037,10 @@ class ColorExceptionWriter(ExceptionWriter):
     def write_code(self, filepath, line, module_globals, is_final, point_at = None):
         lines = []
         if filepath == '<stdin>':
-            lines.append(str(line).rstrip())
+            if len(str(line).rstrip()) == 1:
+                pass    # lines.append("")
+            else:
+                print("Ignoring <stdin> line:", line)
             line = target_line = start = end = 0
         else:
             if is_final:
@@ -1138,7 +1141,7 @@ class ColorExceptionWriter(ExceptionWriter):
 
     def write_exception(self, exception_type, exception_value):
         if exception_value and len(exception_value.args) > 0:
-            output = [
+            output = ["\n",
                 self.config.exception_color, self.exception_name(exception_type), ': ',
                 self.config.exception_arg_color, '\n'.join((str(x) for x in exception_value.args))
             ]
@@ -1146,6 +1149,26 @@ class ColorExceptionWriter(ExceptionWriter):
             output = [self.config.exception_color, self.exception_name(exception_type)]
 
         self.output_text(output)
+
+    def output_text(self, texts):
+        """Write list of texts to stderr.
+        Use this function for all output.
+
+            texts: a string or a list of strings
+        """
+        if not isinstance(texts, (list, tuple)):
+            texts = [texts]
+        count = 0
+        for text in texts:
+            text = str(text)
+            output_stderr.write(text)
+            count += self.visible_length(text)
+        line_length = self.get_line_length()
+        if count % line_length != 0 or self.config.full_line_newline:       # if count == 0 or count % line_length != 0 or self.config.full_line_newline:
+            output_stderr.write('\n')
+        output_stderr.write(RESET_COLOR)
+        if self.config.reset_stdout:
+            sys.stdout.write(RESET_COLOR)
 
 
 exception_writer = ColorExceptionWriter()
