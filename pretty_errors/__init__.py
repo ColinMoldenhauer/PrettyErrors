@@ -1004,3 +1004,182 @@ if __name__ == "__main__":
         print(myval[3])
     except:
         a = "C" * "B"
+
+
+class ColorExceptionWriter(ExceptionWriter):
+    """
+        Custom ExceptionWriter class, that preserves the original structure of the Python exception,
+        only adds color and highlights.
+    """
+    BOLD = "\033[1m"
+
+    def __init__(self, indent_file=2, indent_code=4):
+        self.indent_file = indent_file
+        self.indent_code = indent_code
+
+        # configure custom appearance
+        configure(
+            full_line_newline=False,
+            filename_display=FILENAME_FULL,
+            display_link=False,
+            exception_below=True,
+            lines_before=0,
+
+            header_color              = BRIGHT_RED,
+            filename_color            = YELLOW,
+            line_number_color         = GREEN,
+            function_color            = BLUE,
+            link_color                = MAGENTA,
+            exception_color           = BRIGHT_RED,
+            line_color                = BLACK,          # code snippets
+            exception_arg_color       = BLACK,          # Exception description
+
+
+            code_color                = CYAN,
+            timestamp_color           = BLACK,
+            local_name_color          = RED_BACKGROUND,
+            local_value_color         = CYAN_BACKGROUND,
+            local_len_color           = MAGENTA_BACKGROUND,
+            exception_file_color      = GREEN_BACKGROUND,
+            syntax_error_color        = CYAN,
+            arrow_tail_color          = BRIGHT_YELLOW,
+            arrow_head_color          = BRIGHT_BLUE,
+        )
+
+        super().__init__()
+
+
+    def _local_col(self, txt, col, reset=None):
+        reset = reset or BLACK
+        return f"{col}{txt}{reset}"
+
+    def write_header(self):
+        self.output_text(self._local_col(f"Traceback (most recent call last):", self.config.header_color))
+
+
+    def write_code(self, filepath, line, module_globals, is_final, point_at = None):
+        # TODO: regex raise -> red?
+        lines = []
+        if filepath == '<stdin>':
+            lines.append(str(line).rstrip())
+            line = target_line = start = end = 0
+        else:
+            if is_final:
+                target_line = self.config.lines_before
+                start = line - self.config.lines_before
+                end   = line + self.config.lines_after
+            else:
+                target_line = self.config.trace_lines_before
+                start = line - self.config.trace_lines_before
+                end   = line + self.config.trace_lines_after
+
+            if start < 1:
+                target_line -= (1 - start)
+                start = 1
+
+            for i in range(start, end + 1):
+                lines.append(linecache.getline(filepath, i, module_globals).rstrip())
+
+        min_lead = None
+        for line in lines:
+            if line.strip() == '': continue
+            c = 0
+            while c < len(line) and line[c] in (' ', '\t'):
+                c += 1
+            if min_lead is None or c < min_lead:
+                min_lead = c
+        if min_lead is None:
+            min_lead = 0
+        if min_lead > 0:
+            lines = [line[min_lead:] for line in lines]
+
+        line_length = self.get_line_length()
+
+        for i, line in enumerate(lines):
+            if i == target_line:
+                color = self.config.line_color
+                if point_at is not None:
+                    point_at -= (min_lead + 1)
+            else:
+                color = self.config.code_color
+            color_length = self.visible_length(color)
+            if self.config.truncate_code and len(line) + color_length > line_length:
+                line = line[:line_length - color_length + 3] + '...'
+            if i == target_line and point_at is not None:
+                if point_at >= line_length:
+                    point_at = line_length - 1
+                start_char = point_at
+                while start_char > 0 and line[start_char - 1] not in (' ', '\t'):
+                    start_char -= 1
+                end_char = point_at + 1
+                while end_char < len(line) - 1 and line[end_char] not in (' ', '\t'):
+                    end_char += 1
+                self.output_text([" "*self.indent_code,
+                    color, line[:start_char], RESET_COLOR,
+                    self.config.syntax_error_color, line[start_char:end_char], RESET_COLOR,
+                    color, line[end_char:]
+                ])
+                if self.config.display_arrow:
+                    self.output_text([" "*self.indent_code,
+                        self.config.arrow_tail_color, self.config.arrow_tail_character * point_at,
+                        self.config.arrow_head_color, self.config.arrow_head_character
+                    ])
+            else:
+                self.output_text([" "*self.indent_code, color, line])
+
+        return '\n'.join(lines)
+
+    def write_location(self, path, line, function):
+        line_number = str(line)
+        # line_number = str(line) + ' '
+        # self.output_text('')
+        if self.config.filename_display == FILENAME_FULL:
+            filename = ""
+            path_str = self._local_col(f"\"{path}\"", self.config.filename_color)
+            num_str = self._local_col(f"line {self.BOLD}{line_number}", self.config.line_number_color)
+            func_str = self._local_col(function, self.config.function_color)
+            self.output_text([" "*self.indent_file, f"File {path_str}, {num_str}, in {func_str}"])
+        else:
+            if self.config.filename_display == FILENAME_EXTENDED:
+                line_length = self.get_line_length()
+                filename = path[-(line_length - len(line_number) - len(function) - 4):]
+                if filename != path:
+                    filename = '...' + filename
+            else:
+                filename = os.path.basename(path)
+            if self.config.line_number_first:
+                self.output_text([
+                    self.config.line_number_color, line_number,
+                    self.config.function_color,    function + ' ',
+                    self.config.filename_color,    filename
+                ])
+            else:
+                self.output_text([
+                    self.config.filename_color,    filename + ' ',
+                    self.config.line_number_color, line_number,
+                    self.config.function_color,    function
+                ])
+        if self.config.display_link:
+            self.write_link(path, line)
+
+    def write_exception(self, exception_type, exception_value):
+        if exception_value and len(exception_value.args) > 0:
+            output = [
+                self.config.exception_color, self.exception_name(exception_type), ': ',
+                self.config.exception_arg_color, '\n'.join((str(x) for x in exception_value.args))
+            ]
+        else:
+            output = [self.config.exception_color, self.exception_name(exception_type)]
+
+        for attr in ("filename", "filename2"):
+            if hasattr(exception_value, attr):
+                path = getattr(exception_value, attr)
+                if path is not None:
+                    output.append('\n')
+                    output.append(self.config.exception_file_color)
+                    output.append(path)
+
+        self.output_text(output)
+
+
+exception_writer = ColorExceptionWriter()
