@@ -1143,7 +1143,7 @@ class ColorExceptionWriter(ExceptionWriter):
         if exception_value and len(exception_value.args) > 0:
             output = ["\n",
                 self.config.exception_color, self.exception_name(exception_type), ': ',
-                self.config.exception_arg_color, '\n'.join((str(x) for x in exception_value.args))
+                self.config.exception_arg_color, str(exception_value)
             ]
         else:
             output = [self.config.exception_color, self.exception_name(exception_type)]
